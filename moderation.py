@@ -4,47 +4,61 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 import re, string
 import py_vncorenlp
 
-train = pd.read_csv('./input/train_vn.csv', sep=";")
-test = pd.read_csv('../input/test_vn.csv', sep=";")
 
 label_cols = ['toxic']
-train['none'] = 1-train[label_cols].max(axis=1)
-
 COMMENT = 'comment_text'
-train[COMMENT].fillna("unknown", inplace=True)
-test[COMMENT].fillna("unknown", inplace=True)
+segmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"])
 
-model = py_vncorenlp.VnCoreNLP(annotators=["wseg"])
+def read_train_file():
+    train = pd.read_csv('./input/train_vn.csv', sep=";")
+    train['none'] = 1-train[label_cols].max(axis=1) # no label comment
+    train[COMMENT].fillna("unknown", inplace=True)  # empty comment
+    return train
+train = read_train_file()
+
+def read_test_file():
+    test = pd.read_csv('./input/test_vn.csv', sep=";")
+    test[COMMENT].fillna("unknown", inplace=True)   # empty comment
+    return test
+test = read_test_file()
+
+def predict():
+    x, test_x = create_sparse_matrix()
+
+    preds = np.zeros((len(test), len(label_cols)))
+    for i, j in enumerate(label_cols):
+        print('check if content is:', j)
+        m,r = get_model(x, train[j])
+        preds[:,i] = m.predict_proba(test_x.multiply(r))[:,1]
+
+    print(preds)
+
+def create_sparse_matrix():
+    vec = TfidfVectorizer(
+        ngram_range=(1,2), tokenizer=tokenize,
+        min_df=3, max_df=0.9, strip_accents='unicode', 
+        use_idf=1, smooth_idf=1, sublinear_tf=1,
+    )
+
+    x = vec.fit_transform(train[COMMENT])
+    test_x = vec.transform(test[COMMENT])
+    return x, test_x
+
 def tokenize(s):
-    # re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
-    # rdrsegmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"], save_dir="./vncorenlp")
-    output = model.word_segment(s)
-    return output
+    re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])').sub(r' \1 ', s)
+    sentences = segmenter.word_segment(s)
+    return np.concatenate([sen.split() for sen in sentences])  
 
-n = train.shape[0]
-vec = TfidfVectorizer(
-    ngram_range=(1,2), tokenizer=tokenize,
-    min_df=3, max_df=0.9, strip_accents='unicode', use_idf=1,
-    smooth_idf=1, sublinear_tf=1,
-)
+def get_model(x, y):
+    y = y.values
 
-x = vec.fit_transform(train[COMMENT])           # train_term_doc
-test_x = vec.transform(test[COMMENT])    # test_term_doc
+    r = np.log(naive_bayes(x, 1, y) / naive_bayes(x, 0, y))
+    x_nb = x.multiply(r)
 
-def pr(y_i, y):
+    m = LogisticRegression(C=4, dual=False, max_iter=200)
+    return m.fit(x_nb, y), r
+
+def naive_bayes(x, y_i, y):
     p = x[y==y_i].sum(0)
     return (p+1) / ((y==y_i).sum()+1)
 
-def get_mdl(y):
-    y = y.values
-    r = np.log(pr(1,y) / pr(0,y))
-    m = LogisticRegression(C=4, dual=True)
-    x_nb = x.multiply(r)
-    return m.fit(x_nb, y), r
-
-preds = np.zeros((len(test), len(label_cols)))
-
-for i, j in enumerate(label_cols):
-    print('fit', j)
-    m,r = get_mdl(train[j])
-    preds[:,i] = m.predict_proba(test_x.multiply(r))[:,1]
