@@ -58,5 +58,3 @@ m,r = get_model(x, train_x)
 def predict(str):
     test_x = vec.transform([str])
     return m.predict(test_x.multiply(r))[0]
-
-print(predict("dm may"))
