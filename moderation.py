@@ -4,7 +4,6 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 import re, string
 import py_vncorenlp
 
-
 label_cols = ['toxic']
 COMMENT = 'comment_text'
 segmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"])
@@ -22,25 +21,8 @@ def read_test_file():
     return test
 test = read_test_file()
 
-def predict():
-    x, test_x = create_sparse_matrix()
-
-    preds = np.zeros((len(test), len(label_cols)))
-    for i, j in enumerate(label_cols):
-        print('check if content is:', j)
-        m,r = get_model(x, train[j])
-        preds[:,i] = m.predict_proba(test_x.multiply(r))[:,1]
-
-    print(preds)
-
 def create_sparse_matrix():
-    vec = TfidfVectorizer(
-        ngram_range=(1,2), tokenizer=tokenize,
-        min_df=3, max_df=0.9, strip_accents='unicode', 
-        use_idf=1, smooth_idf=1, sublinear_tf=1,
-    )
-
-    x = vec.fit_transform(train[COMMENT])
+    
     test_x = vec.transform(test[COMMENT])
     return x, test_x
 
@@ -62,3 +44,17 @@ def naive_bayes(x, y_i, y):
     p = x[y==y_i].sum(0)
     return (p+1) / ((y==y_i).sum()+1)
 
+
+vec = TfidfVectorizer(
+    ngram_range=(1,2), tokenizer=tokenize,
+    min_df=3, max_df=0.9, 
+    use_idf=1, smooth_idf=1, sublinear_tf=1,
+)
+
+x = vec.fit_transform(train[COMMENT])
+train_x = train[label_cols[0]]
+m,r = get_model(x, train_x)
+
+def predict(str):
+    test_x = vec.transform([str])
+    return m.predict(test_x.multiply(r))[0]
