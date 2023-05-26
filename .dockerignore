@@ -1,0 +1,24 @@
+# Exclude "build-time" ignore files.
+.dockerignore
+.gcloudignore
+
+# Exclude git history and configuration.
+.git
+.gitignore
+
+__pycache__
+
+# Code editors
+.vscode
+.idea
+
+### OSX ###
+.DS_Store
+
+# Build
+Dockerfile
+docker-compose.yml
+deploy
+README.md
+Makefile
+log.txt

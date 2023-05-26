@@ -1,0 +1,4 @@
+FLASK_DEBUG: false 
+ENV: dev
+PORT: 5000
+API_KEY: 51dc2c6f-073a-4599-88fb-24ab6a385619
